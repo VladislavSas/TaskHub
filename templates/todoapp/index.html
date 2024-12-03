@@ -1,11 +1,70 @@
 {% extends 'todoapp/layout.html' %}
 
 {% block content %}
-
 <div style="margin-top: 50px;" class="ui container">
     <h1 class="ui center aligned header">Мой менеджер задач</h1>
+
+    {% if user.is_authenticated %}
+    <div class="ui segment">
+        <p>Привет, {{ user.username }}!</p>
+        <a href="{% url 'login' %}" class="ui red button">Выйти</a>
+    </div>
+    {% else %}
+    <div class="ui segment">
+        <p>Вы не авторизованы. <a href="{% url 'login' %}">Войдите</a> или <a href="{% url 'register' %}">зарегистрируйтесь</a>.</p>
+    </div>
+    {% endif %}
+
     <h3 class="test_style">Управляй своим временем!</h3>
-<a href="{% url 'calendar' %}" class="ui blue button">Посмотреть календарь</a>
+    <button class="ui primary button" onclick="$('#newTaskModal').modal('show')">Добавить задачу</button>
+    <a href="{% url 'calendar' %}" class="ui blue button">Посмотреть календарь</a>
+    <a href="{% url 'statistics' %}" class="ui blue button">Статистика</a>
+
+
+
+    <!-- Модальное окно для добавления новой задачи -->
+    <div id="newTaskModal" class="ui modal">
+        <div class="header">Новая задача</div>
+        <div class="content">
+            <form class="ui form" action="{% url 'add' %}" method="post">
+                {% csrf_token %}
+                <div class="field">
+                    <label>Название задачи</label>
+                    <input type="text" name="title" placeholder="Введите название задачи" required>
+                </div>
+                <div class="field">
+                    <label>Срок выполнения</label>
+                    <input type="date" name="deadline">
+                </div>
+                <div class="field">
+                    <label>Приоритет</label>
+                    <select name="priority" class="ui dropdown">
+                        <option value="">Не указан</option>
+                        <option value="L">Низкий</option>
+                        <option value="M">Средний</option>
+                        <option value="H">Высокий</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label>Категории</label>
+                    <div class="ui fluid multiple search selection dropdown">
+                        <input type="hidden" name="categories">
+                        <i class="dropdown icon"></i>
+                        <div class="default text">Выберите категории</div>
+                        <div class="menu">
+                            {% for category in categories %}
+                            <div class="item" data-value="{{ category.id }}">{{ category.name }}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                <button class="ui teal basic button" type="submit">Добавить</button>
+            </form>
+        </div>
+        <div class="actions">
+            <div class="ui black deny button">Отмена</div>
+        </div>
+    </div>
 
     <!-- Форма поиска и фильтрации -->
     <div class="ui segment">
@@ -21,7 +80,7 @@
                 </div>
             </div>
             <div class="field">
-                <label>Категории</label>
+                <label>Фильтр по категории</label>
                 <div class="ui fluid multiple search selection dropdown">
                     <input type="hidden" name="categories" value="{{ selected_categories|join:',' }}">
                     <i class="dropdown icon"></i>
@@ -33,8 +92,25 @@
                     </div>
                 </div>
             </div>
+            <div class="field">
+                <label>Фильтр по статусу выполнения</label>
+                <select name="status" class="ui dropdown">
+                    <option value="">Все статусы</option>
+                    <option value="complete" {% if request.GET.status == 'complete' %}selected{% endif %}>Завершено</option>
+                    <option value="incomplete" {% if request.GET.status == 'incomplete' %}selected{% endif %}>Не завершено</option>
+                </select>
+            </div>
+            <div class="field">
+                <label>Фильтр по приоритету</label>
+                <select name="priority" class="ui dropdown">
+                    <option value="">Все приоритеты</option>
+                    <option value="L" {% if request.GET.priority == 'L' %}selected{% endif %}>Низкий</option>
+                    <option value="M" {% if request.GET.priority == 'M' %}selected{% endif %}>Средний</option>
+                    <option value="H" {% if request.GET.priority == 'H' %}selected{% endif %}>Высокий</option>
+                </select>
+            </div>
             <button class="ui teal basic button" type="submit">Применить фильтр</button>
-            {% if selected_categories %}
+            {% if selected_categories or request.GET.status or request.GET.priority %}
             <a class="ui red basic button" href="{% url 'index' %}">Сбросить фильтр</a>
             {% endif %}
         </form>
@@ -51,6 +127,19 @@
                     <input type="text" name="title" id="editTitle" placeholder="Введите новое название задачи" required>
                 </div>
                 <div class="field">
+                    <label>Срок выполнения</label>
+                    <input type="date" name="deadline" id="editDeadline">
+                </div>
+                <div class="field">
+                    <label>Приоритет</label>
+                    <select name="priority" id="editPriority" class="ui dropdown">
+                        <option value="">Не указан</option>
+                        <option value="L">Низкий</option>
+                        <option value="M">Средний</option>
+                        <option value="H">Высокий</option>
+                    </select>
+                </div>
+                <div class="field">
                     <label>Категории</label>
                     <div class="ui fluid multiple search selection dropdown" id="editCategoriesDropdown">
                         <input type="hidden" name="categories" id="editCategories">
@@ -59,19 +148,6 @@
                         <div class="menu">
                             {% for category in categories %}
                             <div class="item" data-value="{{ category.id }}">{{ category.name }}</div>
-                            {% endfor %}
-                        </div>
-                    </div>
-                </div>
-                <div class="field">
-                    <label>Приоритет</label>
-                    <div class="ui selection dropdown" id="editPriorityDropdown">
-                        <input type="hidden" name="priority" id="editPriority">
-                        <i class="dropdown icon"></i>
-                        <div class="default text">Выберите приоритет</div>
-                        <div class="menu">
-                            {% for value, label in todo.PRIORITY_CHOICES %}
-                            <div class="item" data-value="{{ value }}">{{ label }}</div>
                             {% endfor %}
                         </div>
                     </div>
@@ -101,9 +177,14 @@
 
     <!-- Список задач -->
     {% for todo in todo_list %}
-    <div class="ui segment" style="margin-top: 20px;">
+    <div class="ui segment" style="margin-top: 20px; {% if todo.deadline and todo.deadline < today %} border: 2px solid red; {% endif %}">
         <p class="ui big header">{{ todo.title }}</p>
         <p>Создано: {{ todo.created_at|date:"d M Y H:i" }}</p>
+        <p>
+            {% if todo.deadline %}
+            <strong>Срок выполнения:</strong> {{ todo.deadline|date:"d M Y" }}
+            {% endif %}
+        </p>
         <p>
             {% if todo.categories.all %}
             <strong>Категории:</strong>
@@ -143,36 +224,20 @@
     {% endfor %}
 </div>
 
-<script>
-    function openEditModal(todoId, todoTitle) {
-        document.getElementById('editTitle').value = todoTitle;
-        document.getElementById('editForm').action = '/edit/' + todoId + '/';
-        $('#editModal').modal('show');
-    }
+{% block footer %}
 
-    function openDeleteModal(todoId) {
-        document.getElementById('deleteForm').action = '/delete/' + todoId + '/';
-        $('#deleteModal').modal('show');
-    }
+    <div class="ui inverted vertical footer segment" style="padding: 20px 0; background-color: #1b1c1d; color: #fff;">
+        <div class="ui container">
+            <div class="ui center aligned container">
+                <p>© 2024 Мой менеджер задач.</p>
+            </div>
+        </div>
+    </div>
 
-    document.addEventListener('DOMContentLoaded', function() {
-        var calendarEl = document.getElementById('calendar');
-        var calendar = new FullCalendar.Calendar(calendarEl, {
-            initialView: 'dayGridMonth',
-            events: [
-                {% for todo in todo_list %}
-                {
-                    title: '{{ todo.title }}',
-                    start: '{{ todo.created_at|date:"Y-m-d" }}',
-                    url: '{% url 'update' todo_id=todo.id %}'
-                },
-                {% endfor %}
-            ],
-            editable: true,
-            selectable: true
-        });
-        calendar.render();
-    });
-</script>
-
+    {% endblock footer %}
 {% endblock content %}
+
+
+
+
+
