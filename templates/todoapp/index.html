@@ -11,7 +11,7 @@
     </div>
     {% else %}
     <div class="ui segment">
-        <p>Вы не авторизованы. <a href="{% url 'login' %}">Войдите</a> или <a href="{% url 'register' %}">зарегистрируйтесь</a>.</p>
+        <p>Вы не авторизованы. <a href="{% url 'login' %}">Войдите</a> или <a href="{% url 'register' %}">Зарегистрируйтесь</a>.</p>
     </div>
     {% endif %}
 
@@ -19,8 +19,6 @@
     <button class="ui primary button" onclick="$('#newTaskModal').modal('show')">Добавить задачу</button>
     <a href="{% url 'calendar' %}" class="ui blue button">Посмотреть календарь</a>
     <a href="{% url 'statistics' %}" class="ui blue button">Статистика</a>
-
-
 
     <!-- Модальное окно для добавления новой задачи -->
     <div id="newTaskModal" class="ui modal">
@@ -116,12 +114,14 @@
         </form>
     </div>
 
-    <!-- Модальное окно для редактирования -->
+    <!-- Модальное окно для редактирования задачи -->
     <div id="editModal" class="ui modal">
         <div class="header">Редактировать задачу</div>
+        <h3>Необходимо выбрать все категории!</h3>
         <div class="content">
             <form id="editForm" class="ui form" method="post">
                 {% csrf_token %}
+                <input type="hidden" name="id" id="editTaskId">
                 <div class="field">
                     <label>Новое название</label>
                     <input type="text" name="title" id="editTitle" placeholder="Введите новое название задачи" required>
@@ -149,10 +149,10 @@
                             {% for category in categories %}
                             <div class="item" data-value="{{ category.id }}">{{ category.name }}</div>
                             {% endfor %}
-                        </div>
+                     </div>
                     </div>
                 </div>
-                <button class="ui yellow basic button" type="submit">Сохранить изменения</button>
+                <button class="ui teal basic button" type="submit">Сохранить изменения</button>
             </form>
         </div>
         <div class="actions">
@@ -212,10 +212,11 @@
         <a class="ui blue button" href="{% url 'update' todo_id=todo.id %}">Открыть</a>
         {% else %}
         <span class="ui gray label">Не завершено</span>
-        <a class="ui primary basic button" href="{% url 'update' todo_id=todo.id %}">Завершить</a>
+        <a class="ui teal basic button" href="{% url 'update' todo_id=todo.id %}">Завершить</a>
         {% endif %}
         <button class="ui negative basic button" onclick="openDeleteModal('{{ todo.id }}')">Удалить</button>
         <button class="ui yellow basic button" onclick="openEditModal('{{ todo.id }}', '{{ todo.title }}')">Редактировать</button>
+
     </div>
     {% empty %}
     <div class="ui segment">
@@ -235,9 +236,73 @@
     </div>
 
     {% endblock footer %}
+
+<script>
+    function openEditModal(todoId, title, categories) {
+    // Открыть модальное окно
+    $('#editModal').modal('show');
+
+    // Установить значение полей формы
+    $('#editTaskId').val(todoId);
+    $('#editTitle').val(title);
+
+    // Установить выбранные категории
+    $('#editCategoriesDropdown').dropdown('set selected', categories);
+}
+
+// Обработка отправки формы через AJAX
+$('#editForm').on('submit', function(event) {
+    event.preventDefault();  // Отключаем стандартное поведение формы
+
+    var formData = $(this).serialize();  // Собираем данные формы
+
+    $.ajax({
+        type: 'POST',
+        url: "{% url 'edit_ajax' %}",  // URL для обработки AJAX запроса
+        data: formData,
+        success: function(response) {
+            // Закрыть модальное окно
+            $('#editModal').modal('hide');
+
+            // Обновить список задач на странице
+            location.reload();  // Обновляем страницу (можно сделать более изящно)
+        },
+        error: function(xhr, status, error) {
+            console.error("Ошибка при отправке формы: ", error);
+        }
+    });
+});
+
+function openDeleteModal(todoId) {
+    document.getElementById('deleteForm').action = '/delete/' + todoId + '/';
+    $('#deleteModal').modal('show');
+}
+
+$(document).ready(function() {
+    $('.ui.dropdown').dropdown();
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    var calendarEl = document.getElementById('calendar');
+    var calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'dayGridMonth',
+        events: [
+            {% for todo in todo_list %}
+            {
+                title: '{{ todo.title }}',
+                start: '{{ todo.deadline|date:"Y-m-d" }}',
+                url: '{% url 'update' todo_id=todo.id %}'
+            },
+            {% endfor %}
+        ],
+        editable: true,
+        selectable: true
+    });
+    calendar.render();
+});
+
+
+</script>
+
 {% endblock content %}
-
-
-
-
 

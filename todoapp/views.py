@@ -6,6 +6,8 @@ from datetime import datetime
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import login as auth_login
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
 
 
 @login_required
@@ -90,21 +92,22 @@ def delete(request, todo_id):
     todo.delete()
     return redirect('index')
 
+
 @login_required
-def edit(request, todo_id):
-    todo = get_object_or_404(ToDo, id=todo_id, user=request.user)
+@csrf_exempt  # Отключение проверки CSRF для AJAX
+def edit_ajax(request):
     if request.method == 'POST':
+        todo_id = request.POST.get('id')
+        todo = get_object_or_404(ToDo, id=todo_id, user=request.user)
         form = ToDoForm(request.POST, instance=todo)
+
         if form.is_valid():
             form.save()
-            return redirect('index')
-    else:
-        form = ToDoForm(instance=todo)
-    return render(request, 'todoapp/edit.html', {
-        'form': form,
-        'todo': todo,
-        'categories': Category.objects.all(),
-    })
+            return JsonResponse({'status': 'success'})
+        else:
+            return JsonResponse({'status': 'error', 'errors': form.errors})
+
+    return JsonResponse({'status': 'invalid request'}, status=400)
 
 @login_required
 def calendar_view(request):
